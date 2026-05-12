@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Longevity Copilot MCP - Tool Catalog</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --bg:#F7F3EC; --paper:#FBFAF6; --ink:#1C1B18; --muted:#6B6760;
+    --accent:#1F3A2E; --accent-warm:#B5563C; --border:#ECE6DA;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background:var(--bg); color:var(--ink); font: 14px/1.5 system-ui, -apple-system, Inter, sans-serif; padding: 32px 24px; max-width: 1100px; margin: 0 auto; }
+  h1 { font-size: 28px; color: var(--accent); font-style: italic; font-weight: 500; margin-bottom: 4px; }
+  .sub { color: var(--muted); margin-bottom: 24px; }
+  .config { background: var(--paper); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 24px; display:grid; gap:10px; grid-template-columns: max-content 1fr; }
+  .config label { color: var(--muted); font-weight: 600; align-self:center; }
+  .config input { padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font: inherit; background: var(--bg); }
+  .tool { background: var(--paper); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; margin-bottom: 14px; }
+  .tool h2 { font-size: 16px; color: var(--accent); font-family: ui-monospace, SFMono-Regular, monospace; margin-bottom: 4px; }
+  .tool .desc { color: var(--ink); margin-bottom: 10px; }
+  .row { display:flex; gap:8px; align-items: flex-start; flex-wrap: wrap; }
+  textarea { width: 100%; min-height: 80px; padding: 10px; border: 1px solid var(--border); border-radius: 6px; font: 12px/1.5 ui-monospace, monospace; background: var(--bg); }
+  button { padding: 8px 14px; border: none; border-radius: 6px; background: var(--accent); color: var(--paper); font: inherit; font-weight: 600; cursor: pointer; }
+  button:hover { background: #295A48; }
+  pre.result { background: #1C1B18; color: #C8D2C2; padding: 12px; border-radius: 6px; font: 12px/1.4 ui-monospace, monospace; max-height: 320px; overflow: auto; white-space: pre-wrap; margin-top: 10px; }
+  .pill { display:inline-block; padding: 2px 9px; background: var(--bg); border:1px solid var(--border); border-radius:999px; font-size:11px; color: var(--muted); margin-right:6px; }
+  .pill.warm { color: var(--accent-warm); }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<h1>Longevity Copilot MCP - Tool Catalog</h1>
+<div class="sub">Click "Try it" on any tool to POST live to your MCP. Judge-friendly browser console for the 15 tools.</div>
+
+<div class="config">
+  <label for="base">MCP base URL</label>
+  <input id="base" value="http://127.0.0.1:8080" />
+  <label for="token">Bearer token (optional)</label>
+  <input id="token" placeholder="leave empty if MCP_BEARER_TOKEN is unset" />
+</div>
+
+<div id="tools"></div>
+
+<script>
+const TOOLS = [
+  { name: "list_supported_sources", args: {} },
+  { name: "get_patient_demographics", args: {} },
+  { name: "get_patient_labs", args: {} },
+  { name: "get_patient_medications", args: {} },
+  { name: "get_patient_genomics", args: {} },
+  { name: "get_wearable_snapshot", args: { window: "last_7_days" } },
+  { name: "normalize_biomarker", args: { vendor: "labcorp", vendor_code: "HEMOGLOBIN_A1C" } },
+  { name: "fhir_passthrough", args: { resource_type: "Patient", params: { "_count": "2" } } },
+  { name: "calc_homa_ir", args: { fasting_insulin_uIU_mL: 7.2, fasting_glucose_mg_dL: 88 } },
+  { name: "calc_egfr_ckdepi_2021", args: { creatinine_mg_dL: 1.05, age_years: 26, sex: "male" } },
+  { name: "calc_ascvd_10yr", args: { age_years: 55, sex: "male", race: "white", total_cholesterol_mg_dL: 213, hdl_mg_dL: 50, sbp_mmHg: 120, treated_for_hypertension: false, diabetes: false, smoker: false } },
+  { name: "rxnav_interactions", args: { drug_name: "Metformin" } },
+  { name: "audit_tail", args: { n: 10 } },
+  { name: "generate_clinical_pdf", args: { headline: "Test brief", patient_label: "Tyrone S.", findings: [{ name: "HbA1c", value: 5.4, unit: "%", source: "Quest" }], plan: ["Repeat in 90 days"], monitoring: ["TSH in 90 days"] } },
+  { name: "list_reports", args: { n: 25 } },
+];
+
+const root = document.getElementById('tools');
+
+function renderTools(){
+  root.innerHTML = '';
+  for (const t of TOOLS) {
+    const div = document.createElement('div');
+    div.className = 'tool';
+    const args = encodeURIComponent(JSON.stringify(t.args, null, 2));
+    const pillClass = t.name.startsWith('calc_') ? 'warm' : '';
+    div.innerHTML = `
+      <h2>${t.name} <span class="pill ${pillClass}">tools/call</span></h2>
+      <div class="desc">Edit the arguments below and click Try it.</div>
+      <textarea id="args-${t.name}">${JSON.stringify(t.args, null, 2)}</textarea>
+      <div class="row" style="margin-top:8px;">
+        <button onclick="call('${t.name}')">Try it</button>
+      </div>
+      <pre class="result" id="out-${t.name}"></pre>
+    `;
+    root.appendChild(div);
+  }
+}
+
+async function call(name){
+  const base = document.getElementById('base').value.replace(/\/+$/, '');
+  const token = document.getElementById('token').value.trim();
+  const ta = document.getElementById(`args-${name}`);
+  const out = document.getElementById(`out-${name}`);
+  out.textContent = "Calling...";
+  let args = {};
+  try { args = JSON.parse(ta.value); } catch (e) { out.textContent = "Invalid JSON: " + e.message; return; }
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+  const body = { jsonrpc: '2.0', method: 'tools/call', params: { name, arguments: args }, id: Date.now() };
+  try {
+    const r = await fetch(base + '/mcp', { method: 'POST', headers, body: JSON.stringify(body) });
+    const data = await r.json();
+    if (data.error) {
+      out.textContent = "Error: " + JSON.stringify(data.error, null, 2);
+      return;
+    }
+    let inner = data.result?.content?.[0]?.text;
+    try { inner = JSON.stringify(JSON.parse(inner), null, 2); } catch {}
+    out.textContent = inner || JSON.stringify(data, null, 2);
+    // If the result includes a URL to a report, make it clickable.
+    if (name === 'generate_clinical_pdf' && inner && inner.includes('"relative_url"')) {
+      const parsed = JSON.parse(inner);
+      const a = document.createElement('a');
+      a.href = base + parsed.relative_url;
+      a.target = '_blank';
+      a.textContent = 'Open the PDF';
+      a.style.display = 'inline-block';
+      a.style.marginTop = '8px';
+      out.parentNode.appendChild(a);
+    }
+  } catch (err) {
+    out.textContent = "Fetch failed: " + err.message;
+  }
+}
+
+renderTools();
+</script>
+
+<p style="color:var(--muted); margin-top:24px;">Longevity Copilot MCP v1.1 - <a href="https://github.com">Source</a> - 15 tools, 107 vendor mappings, FHIR R4 + LOINC.</p>
+
+</body>
+</html>

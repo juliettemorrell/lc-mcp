@@ -1,0 +1,73 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.5",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-05-12T15:00:00Z",
+    "component": {
+      "type": "application",
+      "name": "longevity-copilot-mcp",
+      "version": "1.3.0",
+      "description": "MCP server for the Longevity Copilot orchestrator. Normalizes labs/wearables/EHRs to FHIR R4 + LOINC + UCUM, runs clinical calculators, generates PDF briefs, and writes back to FHIR.",
+      "licenses": [{"license": {"id": "Apache-2.0"}}]
+    },
+    "tools": [{"name": "hand-authored"}]
+  },
+  "components": [
+    {
+      "type": "library",
+      "name": "fastapi",
+      "version": "0.115.2",
+      "purl": "pkg:pypi/fastapi@0.115.2",
+      "licenses": [{"license": {"id": "MIT"}}],
+      "description": "Modern web framework for building APIs"
+    },
+    {
+      "type": "library",
+      "name": "uvicorn",
+      "version": "0.32.0",
+      "purl": "pkg:pypi/uvicorn@0.32.0",
+      "licenses": [{"license": {"id": "BSD-3-Clause"}}],
+      "description": "ASGI server"
+    },
+    {
+      "type": "library",
+      "name": "httpx",
+      "version": "0.27.2",
+      "purl": "pkg:pypi/httpx@0.27.2",
+      "licenses": [{"license": {"id": "BSD-3-Clause"}}],
+      "description": "Async HTTP client (FHIR proxy + RxNav)"
+    },
+    {
+      "type": "library",
+      "name": "reportlab",
+      "version": "4.2.5",
+      "purl": "pkg:pypi/reportlab@4.2.5",
+      "licenses": [{"license": {"id": "BSD-3-Clause"}}],
+      "description": "PDF generation for clinical briefs"
+    },
+    {
+      "type": "library",
+      "name": "matplotlib",
+      "version": "3.9.2",
+      "purl": "pkg:pypi/matplotlib@3.9.2",
+      "licenses": [{"license": {"id": "PSF-2.0"}}],
+      "description": "Lab trend chart generation"
+    }
+  ],
+  "services": [
+    {
+      "name": "HAPI FHIR public test server",
+      "endpoints": ["https://hapi.fhir.org/baseR4"],
+      "data": [{"classification": "Synthetic + public test data only"}]
+    },
+    {
+      "name": "NIH RxNav",
+      "endpoints": ["https://rxnav.nlm.nih.gov/REST"],
+      "data": [{"classification": "Public terminology service"}]
+    }
+  ],
+  "dependencies": [
+    {"ref": "longevity-copilot-mcp", "dependsOn": ["fastapi", "uvicorn", "httpx", "reportlab", "matplotlib"]}
+  ]
+}
